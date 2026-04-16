@@ -4,16 +4,16 @@ from settings import PLAYER_SPEED
 
 
 class Player:
-    def __init__(self, x, y):
+    def __init__(self):
         self.x = 0
         self.y = 0
         self.angle = 0
 
 
     def update(self, camera):
-        keys = pygame.get.pressed()
+        keys = pygame.key.get_pressed()
 
-        dx, dy = 0
+        dx, dy = 0, 0
 
         if keys[pygame.K_w]:
             dy -= PLAYER_SPEED
@@ -41,14 +41,14 @@ class Player:
         screen_y = self.y - camera.y
 
         pygame.draw.circle(screen, (0, 255, 0),
-                           (int(screen_x), int(screen_y)))
+                           (int(screen_x), int(screen_y)), 10)
 
-        vision_x = screen_x + math.cos(self.angle)
-        vision_y = screen_y + math.sin(self.angle)
+        vision_x = screen_x + math.cos(self.angle) * 40
+        vision_y = screen_y + math.sin(self.angle) * 40
 
         pygame.draw.line(screen, (0, 255, 255),
                          (screen_x, screen_y),
-                         (vision_x, vision_y))
+                         (vision_x, vision_y), 3)
 
 
 
