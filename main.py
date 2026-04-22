@@ -1,9 +1,10 @@
 import sys
-
+import math
 import pygame
+
 from settings import *
 from player import Player
-
+from bullet import Bullet
 
 pygame.init()
 
@@ -11,6 +12,7 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Bullet vs Dead")
 
 clock = pygame.time.Clock()
+
 
 class Camera:
     def __init__(self):
@@ -21,8 +23,11 @@ class Camera:
         self.x = target.x - WIDTH // 2
         self.y = target.y - HEIGHT // 2
 
+
 player = Player()
 camera = Camera()
+
+bullets = []
 
 running = True
 
@@ -30,16 +35,30 @@ while running:
     clock.tick(FPS)
 
     for event in pygame.event.get():
+
         if event.type == pygame.QUIT:
             running = False
             pygame.quit()
             sys.exit()
 
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1:
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if event.button == 1:  # ЛКМ
+                        bullet = Bullet(player.x, player.y, player.angle)
+                        bullets.append(bullet)
+
     player.update(camera)
     camera.update(player)
+
+    for bullet in bullets:
+        bullet.update()
 
     screen.fill((20, 20, 20))
 
     player.draw(screen, camera)
+
+    for bullet in bullets:
+        bullet.draw(screen, camera)
 
     pygame.display.flip()
