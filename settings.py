@@ -6,3 +6,9 @@ FPS = 60
 PLAYER_SPEED = 5
 BULLET_SPEED = 50
 BULLET_RADIUS = 5
+
+# Цвета (RGB) — согласовано с рендером и камерой из README
+COLOR_BG = (20, 20, 20)
+COLOR_PLAYER = (0, 255, 0)
+COLOR_PLAYER_AIM = (0, 255, 255)
+COLOR_BULLET = (255, 255, 0)

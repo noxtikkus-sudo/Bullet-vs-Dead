@@ -1,10 +1,8 @@
-import sys
-import math
 import pygame
 
-from settings import *
-from player import Player
 from bullet import Bullet
+from player import Player
+from settings import COLOR_BG, FPS, HEIGHT, WIDTH
 
 pygame.init()
 
@@ -26,27 +24,21 @@ class Camera:
 
 player = Player()
 camera = Camera()
-
 bullets = []
 
 running = True
-
 while running:
     clock.tick(FPS)
 
     for event in pygame.event.get():
-
         if event.type == pygame.QUIT:
             running = False
-            pygame.quit()
-            sys.exit()
+            break
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            bullets.append(Bullet(player.x, player.y, player.angle))
 
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1:
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    if event.button == 1:  # ЛКМ
-                        bullet = Bullet(player.x, player.y, player.angle)
-                        bullets.append(bullet)
+    if not running:
+        break
 
     player.update(camera)
     camera.update(player)
@@ -54,11 +46,12 @@ while running:
     for bullet in bullets:
         bullet.update()
 
-    screen.fill((20, 20, 20))
+    screen.fill(COLOR_BG)
 
     player.draw(screen, camera)
-
     for bullet in bullets:
         bullet.draw(screen, camera)
 
     pygame.display.flip()
+
+pygame.quit()

@@ -1,32 +1,30 @@
-import pygame
-from settings import BULLET_SPEED, BULLET_RADIUS
 import math
 
+import pygame
 
-class Bullet():
+from settings import BULLET_RADIUS, BULLET_SPEED, COLOR_BULLET
+
+
+class Bullet:
     def __init__(self, x, y, angle):
-        self.x = x
-        self.y = y
+        self.x = float(x)
+        self.y = float(y)
         self.angle = angle
-
-        # направление
-        self.dx = math.cos(angle)
-        self.dy = math.sin(angle)
-
+        self.vx = math.cos(angle) * BULLET_SPEED
+        self.vy = math.sin(angle) * BULLET_SPEED
 
     def update(self):
-        self.x += self.dx * BULLET_SPEED
-        self.y += self.dy * BULLET_SPEED
-
+        self.x += self.vx
+        self.y += self.vy
 
     def draw(self, screen, camera):
         screen_x = self.x - camera.x
         screen_y = self.y - camera.y
 
-        pygame.draw.circle(screen, (255, 255, 0),
-                           (int(screen_x), int(screen_y)),
-                           BULLET_RADIUS)
-
-
-
+        pygame.draw.circle(
+            screen,
+            COLOR_BULLET,
+            (int(screen_x), int(screen_y)),
+            BULLET_RADIUS,
+        )
 
