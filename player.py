@@ -2,17 +2,19 @@ import math
 
 import pygame
 
-from settings import COLOR_PLAYER, COLOR_PLAYER_AIM, PLAYER_SPEED
+from settings import (
+    COLOR_PLAYER,
+    COLOR_PLAYER_AIM,
+    PLAYER_DAMAGE_COOLDOWN,
+    PLAYER_MAX_HP,
+    PLAYER_SPEED,
+)
 
 PLAYER_RADIUS = 10
 AIM_LINE_LENGTH = 40
-PLAYER_MAX_HP = 100
-PLAYER_DAMAGE_COOLDOWN = 0.5
 
 
 class Player:
-    """Top-down player: move, aim at mouse, HP and damage."""
-
     def __init__(self):
         self.x = 0.0
         self.y = 0.0
@@ -30,7 +32,7 @@ class Player:
             self.hp = 0
             self.alive = False
 
-    def update(self, camera, dt):
+    def update(self, camera, dt, game_map=None):
         if self._damage_cooldown > 0:
             self._damage_cooldown = max(0.0, self._damage_cooldown - dt)
 
@@ -55,8 +57,14 @@ class Player:
             scale = PLAYER_SPEED / length
             dx *= scale
             dy *= scale
-        self.x += dx
-        self.y += dy
+
+        if game_map is not None:
+            self.x, self.y = game_map.resolve_circle_move(
+                self.x, self.y, PLAYER_RADIUS, dx, dy, for_enemy=False
+            )
+        else:
+            self.x += dx
+            self.y += dy
 
         mouse_x, mouse_y = pygame.mouse.get_pos()
         world_mouse_x = mouse_x + camera.x

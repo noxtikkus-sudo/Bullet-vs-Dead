@@ -2,10 +2,7 @@
 
 import pygame
 
-ENEMY_SPEED = 4
-ENEMY_RADIUS = 12
-ENEMY_HP = 1
-COLOR_ENEMY = (200, 50, 50)
+from settings import COLOR_ENEMY, ENEMY_HP, ENEMY_RADIUS, ENEMY_SPEED
 
 
 class Enemy:
@@ -21,7 +18,7 @@ class Enemy:
     def is_alive(self):
         return self.alive
 
-    def update(self, player):
+    def update(self, player, game_map=None):
         if not self.alive:
             return
 
@@ -32,8 +29,16 @@ class Enemy:
             return
 
         step = min(ENEMY_SPEED, length)
-        self.x += dx / length * step
-        self.y += dy / length * step
+        move_x = dx / length * step
+        move_y = dy / length * step
+
+        if game_map is not None:
+            self.x, self.y = game_map.resolve_circle_move(
+                self.x, self.y, ENEMY_RADIUS, move_x, move_y, for_enemy=True
+            )
+        else:
+            self.x += move_x
+            self.y += move_y
 
     def draw(self, screen, camera):
         if not self.alive:

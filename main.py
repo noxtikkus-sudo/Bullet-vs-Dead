@@ -2,15 +2,13 @@ import pygame
 
 from bullet import Bullet
 from collision import (
-    check_bullet_enemy_collisions,
     check_enemy_player_collisions,
     cleanup_bullets,
 )
+from map import GameMap
 from player import Player
-from settings import COLOR_BG, FPS, HEIGHT, WIDTH
+from settings import COLOR_BG, COLOR_UI, FPS, HEIGHT, WIDTH
 from wave_manager import WaveManager
-
-COLOR_UI = (255, 255, 255)
 
 pygame.init()
 
@@ -26,9 +24,10 @@ class Camera:
         self.x = 0
         self.y = 0
 
-    def update(self, target):
+    def update(self, target, game_map):
         self.x = target.x - WIDTH // 2
         self.y = target.y - HEIGHT // 2
+        self.x, self.y = game_map.clamp_camera(self.x, self.y, WIDTH, HEIGHT)
 
 
 def draw_hud(surface, player, wave):
@@ -39,14 +38,17 @@ def draw_hud(surface, player, wave):
 
 
 def draw_game_over(surface):
-    text = font.render("Game Over — close the window", True, COLOR_UI)
+    text = font.render("Game Over — закрой окно", True, COLOR_UI)
     rect = text.get_rect(center=(WIDTH // 2, HEIGHT // 2))
     surface.blit(text, rect)
 
 
+game_map = GameMap()
 player = Player()
+player.x, player.y = game_map.spawn_point
+
 camera = Camera()
-wave_manager = WaveManager()
+wave_manager = WaveManager(game_map)
 bullets = []
 
 wave_manager.start_next_wave(player.x, player.y)
@@ -70,22 +72,24 @@ while running:
         break
 
     if player.alive:
-        player.update(camera, dt)
-        camera.update(player)
+        player.update(camera, dt, game_map)
+        camera.update(player, game_map)
 
-        wave_manager.update(player)
+        wave_manager.update(player, game_map)
 
         for bullet in bullets:
-            bullet.update()
+            bullet.update(game_map, wave_manager.enemies)
 
-        check_bullet_enemy_collisions(bullets, wave_manager.enemies)
         check_enemy_player_collisions(wave_manager.enemies, player)
         cleanup_bullets(bullets)
 
-        if wave_manager.all_defeated():
+        if wave_manager.wave_cleared():
             wave_manager.start_next_wave(player.x, player.y)
+        else:
+            wave_manager.remove_dead()
 
     screen.fill(COLOR_BG)
+    game_map.draw(screen, camera)
 
     for enemy in wave_manager.enemies:
         enemy.draw(screen, camera)
