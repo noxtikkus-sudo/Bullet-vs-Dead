@@ -32,13 +32,9 @@ class Enemy:
         move_x = dx / length * step
         move_y = dy / length * step
 
-        if game_map is not None:
-            self.x, self.y = game_map.resolve_circle_move(
-                self.x, self.y, ENEMY_RADIUS, move_x, move_y, for_enemy=True
-            )
-        else:
-            self.x += move_x
-            self.y += move_y
+        self.x, self.y = game_map.resolve_circle_move(
+            self.x, self.y, ENEMY_RADIUS, move_x, move_y, for_enemy=True
+        )
 
     def draw(self, screen, camera):
         if not self.alive:
@@ -62,4 +58,4 @@ class Enemy:
 
     def hits_circle(self, x, y, radius):
         """Пересечение врага с кругом в точке (x, y) с заданным радиусом."""
-        return math.hypot(x - self.x, y - self.y) < ENEMY_RADIUS + radius
+        return math.hypot(x - self.x, y - self.y) <= ENEMY_RADIUS + radius

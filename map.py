@@ -1,9 +1,11 @@
 import math
-from enum import Enum
 
 import pygame
 
 from settings import (
+    BOARD_HITS,
+    BOARD_INTERACT_DISTANCE,
+    BOARD_SEGMENT_SIZE,
     COLOR_FLOOR,
     COLOR_WALL,
     COLOR_WINDOW,
@@ -12,51 +14,101 @@ from settings import (
     MAP_WIDTH,
     WALL_THICKNESS,
     WINDOW_WIDTH,
+    ENEMY_RADIUS,
+    ZOMBIE_BOARD_ATTACK_COOLDOWN,
 )
 
 DOOR_WIDTH = 110
 
 
-class WindowState(Enum):
-    OPEN = "open"
-    BOARDED = "boarded"
-    BROKEN = "broken"
-
-
 class Window:
-    """Проём в стене: игрок не проходит; зомби — через открытое/сломанное."""
+    """Проём в стене. Доски: по BOARD_HITS ударов на каждую."""
 
     def __init__(self, rect, side):
         self.rect = pygame.Rect(rect)
         self.side = side
-        self.state = WindowState.OPEN
+        self.boards = []
+        self._attack_cooldown = 0.0
+
+    @property
+    def max_boards(self):
+        length = max(self.rect.width, self.rect.height)
+        return max(1, length // BOARD_SEGMENT_SIZE)
+
+    @property
+    def has_boards(self):
+        return len(self.boards) > 0
+
+    @property
+    def is_fully_boarded(self):
+        return len(self.boards) >= self.max_boards
 
     def blocks_movement(self, for_enemy=False):
-        if self.state == WindowState.BROKEN:
+        if for_enemy:
+            return self.has_boards
+        return True
+
+    def add_board(self):
+        if self.is_fully_boarded:
             return False
-        if self.state == WindowState.BOARDED:
-            return True
-        return not for_enemy
+        self.boards.append(BOARD_HITS)
+        return True
 
-    def board(self):
-        self.state = WindowState.BOARDED
+    def damage_board(self, amount=1):
+        if not self.boards:
+            return
+        self.boards[0] -= amount
+        if self.boards[0] <= 0:
+            self.boards.pop(0)
 
-    def break_board(self):
-        self.state = WindowState.BROKEN
+    def distance_to(self, x, y):
+        cx = max(self.rect.left, min(x, self.rect.right))
+        cy = max(self.rect.top, min(y, self.rect.bottom))
+        return math.hypot(x - cx, y - cy)
 
     @property
     def is_open(self):
-        return self.state in (WindowState.OPEN, WindowState.BROKEN)
+        return True
+
+    def _board_color(self, hp):
+        ratio = hp / BOARD_HITS
+        base = COLOR_WINDOW_BOARDED
+        return (
+            int(base[0] * ratio + 60 * (1 - ratio)),
+            int(base[1] * ratio + 40 * (1 - ratio)),
+            int(base[2] * ratio + 30 * (1 - ratio)),
+        )
 
     def draw(self, screen, camera):
         screen_rect = self.rect.move(-camera.x, -camera.y)
-        if self.state == WindowState.BOARDED:
-            color = COLOR_WINDOW_BOARDED
-        elif self.state == WindowState.BROKEN:
-            color = (60, 40, 30)
+        pygame.draw.rect(screen, COLOR_WINDOW, screen_rect)
+
+        if not self.boards:
+            return
+
+        horizontal = self.rect.width >= self.rect.height
+        max_b = self.max_boards
+
+        if horizontal:
+            seg_w = screen_rect.width / max_b
+            for i, hp in enumerate(self.boards):
+                seg = pygame.Rect(
+                    screen_rect.x + int(i * seg_w) + 1,
+                    screen_rect.y + 1,
+                    int(seg_w) - 2,
+                    screen_rect.height - 2,
+                )
+                pygame.draw.rect(screen, self._board_color(hp), seg)
         else:
-            color = COLOR_WINDOW
-        pygame.draw.rect(screen, color, screen_rect)
+            seg_h = screen_rect.height / max_b
+            for i, hp in enumerate(self.boards):
+                seg = pygame.Rect(
+                    screen_rect.x + 1,
+                    screen_rect.y + int(i * seg_h) + 1,
+                    screen_rect.width - 2,
+                    int(seg_h) - 2,
+                )
+                pygame.draw.rect(screen, self._board_color(hp), seg)
 
     def spawn_outside(self, offset):
         cx = self.rect.centerx
@@ -230,7 +282,7 @@ class GameMap:
             if dx * dx + dy * dy < radius * radius:
                 return True
         for window in self.windows:
-            if window.blocks_movement(for_enemy=False):
+            if window.has_boards or window.blocks_movement(for_enemy=False):
                 rect = window.rect
                 closest_x = max(rect.left, min(x, rect.right))
                 closest_y = max(rect.top, min(y, rect.bottom))
@@ -266,6 +318,43 @@ class GameMap:
             if window.is_open:
                 points.append(window.spawn_outside(offset))
         return points
+
+    def get_window_near(self, x, y, max_dist=BOARD_INTERACT_DISTANCE):
+        best = None
+        best_dist = max_dist
+        for window in self.windows:
+            if window.is_fully_boarded:
+                continue
+            dist = window.distance_to(x, y)
+            if dist < best_dist:
+                best_dist = dist
+                best = window
+        return best
+
+    def try_board_window(self, x, y):
+        window = self.get_window_near(x, y)
+        if window is None:
+            return False
+        return window.add_board()
+
+    def process_zombie_board_attacks(self, enemies, dt):
+        for window in self.windows:
+            if window._attack_cooldown > 0:
+                window._attack_cooldown = max(0.0, window._attack_cooldown - dt)
+
+        for enemy in enemies:
+            if not enemy.is_alive:
+                continue
+            for window in self.windows:
+                if not window.has_boards:
+                    continue
+                if window._attack_cooldown > 0:
+                    continue
+                if window.distance_to(enemy.x, enemy.y) > ENEMY_RADIUS + 25:
+                    continue
+                window.damage_board(1)
+                window._attack_cooldown = ZOMBIE_BOARD_ATTACK_COOLDOWN
+                break
 
     def draw(self, screen, camera):
         for floor_rect, alt in self.floor_rects:

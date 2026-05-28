@@ -30,11 +30,14 @@ class Camera:
         self.x, self.y = game_map.clamp_camera(self.x, self.y, WIDTH, HEIGHT)
 
 
-def draw_hud(surface, player, wave):
+def draw_hud(surface, player, wave, hint=""):
     hp_text = font.render(f"HP: {player.hp}", True, COLOR_UI)
     wave_text = font.render(f"Wave: {wave}", True, COLOR_UI)
     surface.blit(hp_text, (10, 10))
     surface.blit(wave_text, (10, 40))
+    if hint:
+        hint_text = font.render(hint, True, COLOR_UI)
+        surface.blit(hint_text, (10, 70))
 
 
 def draw_game_over(surface):
@@ -67,6 +70,8 @@ while running:
             and event.button == 1
         ):
             bullets.append(Bullet(player.x, player.y, player.angle))
+        if player.alive and event.type == pygame.KEYDOWN and event.key == pygame.K_e:
+            game_map.try_board_window(player.x, player.y)
 
     if not running:
         break
@@ -76,6 +81,7 @@ while running:
         camera.update(player, game_map)
 
         wave_manager.update(player, game_map)
+        game_map.process_zombie_board_attacks(wave_manager.enemies, dt)
 
         for bullet in bullets:
             bullet.update(game_map, wave_manager.enemies)
@@ -100,7 +106,10 @@ while running:
     for bullet in bullets:
         bullet.draw(screen, camera)
 
-    draw_hud(screen, player, wave_manager.wave)
+    board_hint = ""
+    if player.alive and game_map.get_window_near(player.x, player.y):
+        board_hint = "E — поставить доску (3 удара на доску)"
+    draw_hud(screen, player, wave_manager.wave, board_hint)
     if not player.alive:
         draw_game_over(screen)
 
