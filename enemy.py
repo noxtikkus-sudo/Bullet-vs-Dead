@@ -1,61 +1,49 @@
-﻿import math
+﻿from entity import CircleEntity
+from settings import (
+    COLOR_ENEMY,
+    ENEMY_HP,
+    ENEMY_RADIUS,
+    ENEMY_REPATH_TIME,
+    ENEMY_SPEED,
+    ENEMY_WAYPOINT_REACH,
+)
+from utils import distance, normalize_move
 
-import pygame
 
-from settings import COLOR_ENEMY, ENEMY_HP, ENEMY_RADIUS, ENEMY_SPEED
-
-
-class Enemy:
-    """Зомби: идёт к игроку, получает урон, рисуется с учётом камеры."""
-
+class Enemy(CircleEntity):
     def __init__(self, x, y, hp=None):
-        self.x = float(x)
-        self.y = float(y)
-        self.hp = ENEMY_HP if hp is None else hp
-        self.alive = True
+        super().__init__(x, y, ENEMY_RADIUS, ENEMY_HP if hp is None else hp)
+        self.path = []
+        self.path_index = 0
+        self.repath_timer = 0.0
 
-    @property
-    def is_alive(self):
-        return self.alive
+    def _move_toward(self, target_x, target_y, game_map):
+        move_x, move_y = normalize_move(target_x - self.x, target_y - self.y, ENEMY_SPEED)
+        if move_x == 0 and move_y == 0:
+            return
+        self.x, self.y = game_map.resolve_circle_move(
+            self.x, self.y, self.radius, move_x, move_y, for_enemy=True
+        )
 
-    def update(self, player, game_map=None):
+    def update(self, player, game_map, dt, navgrid, pathfinder):
         if not self.alive:
             return
 
-        dx = player.x - self.x
-        dy = player.y - self.y
-        length = math.hypot(dx, dy)
-        if length == 0:
-            return
+        self.repath_timer -= dt
+        if self.repath_timer <= 0 or self.path_index >= len(self.path):
+            start = navgrid.world_to_cell(self.x, self.y)
+            goal = navgrid.world_to_cell(player.x, player.y)
+            self.path = pathfinder.find_path(navgrid, start, goal)
+            self.path_index = 1 if len(self.path) > 1 else 0
+            self.repath_timer = ENEMY_REPATH_TIME
 
-        step = min(ENEMY_SPEED, length)
-        move_x = dx / length * step
-        move_y = dy / length * step
-
-        self.x, self.y = game_map.resolve_circle_move(
-            self.x, self.y, ENEMY_RADIUS, move_x, move_y, for_enemy=True
-        )
+        if self.path and self.path_index < len(self.path):
+            wx, wy = navgrid.cell_to_world(self.path[self.path_index])
+            self._move_toward(wx, wy, game_map)
+            if distance(self.x, self.y, wx, wy) < ENEMY_WAYPOINT_REACH:
+                self.path_index += 1
+        else:
+            self._move_toward(player.x, player.y, game_map)
 
     def draw(self, screen, camera):
-        if not self.alive:
-            return
-
-        screen_x = int(self.x - camera.x)
-        screen_y = int(self.y - camera.y)
-        pygame.draw.circle(
-            screen,
-            COLOR_ENEMY,
-            (screen_x, screen_y),
-            ENEMY_RADIUS,
-        )
-
-    def take_damage(self, amount=1):
-        if not self.alive:
-            return
-        self.hp -= amount
-        if self.hp <= 0:
-            self.alive = False
-
-    def hits_circle(self, x, y, radius):
-        """Пересечение врага с кругом в точке (x, y) с заданным радиусом."""
-        return math.hypot(x - self.x, y - self.y) <= ENEMY_RADIUS + radius
+        self.draw_circle(screen, camera, COLOR_ENEMY)

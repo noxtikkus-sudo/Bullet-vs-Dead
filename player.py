@@ -2,25 +2,25 @@ import math
 
 import pygame
 
+from entity import CircleEntity
 from settings import (
     COLOR_PLAYER,
     COLOR_PLAYER_AIM,
+    DIAGONAL_SCALE,
+    PLAYER_AIM_LENGTH,
+    PLAYER_AIM_WIDTH,
     PLAYER_DAMAGE_COOLDOWN,
     PLAYER_MAX_HP,
+    PLAYER_RADIUS,
     PLAYER_SPEED,
 )
-
-PLAYER_RADIUS = 10
-AIM_LINE_LENGTH = 40
+from utils import tick_down
 
 
-class Player:
+class Player(CircleEntity):
     def __init__(self):
-        self.x = 0.0
-        self.y = 0.0
+        super().__init__(0, 0, PLAYER_RADIUS, PLAYER_MAX_HP)
         self.angle = 0.0
-        self.hp = PLAYER_MAX_HP
-        self.alive = True
         self._damage_cooldown = 0.0
 
     def take_damage(self, amount):
@@ -32,63 +32,41 @@ class Player:
             self.hp = 0
             self.alive = False
 
-    def update(self, camera, dt, game_map=None):
-        if self._damage_cooldown > 0:
-            self._damage_cooldown = max(0.0, self._damage_cooldown - dt)
-
+    def update(self, camera, dt, game_map):
+        self._damage_cooldown = tick_down(self._damage_cooldown, dt)
         if not self.alive:
             return
 
         keys = pygame.key.get_pressed()
+        dx = (keys[pygame.K_d] - keys[pygame.K_a]) * PLAYER_SPEED
+        dy = (keys[pygame.K_s] - keys[pygame.K_w]) * PLAYER_SPEED
+        if dx and dy:
+            dx *= DIAGONAL_SCALE
+            dy *= DIAGONAL_SCALE
 
-        dx = 0.0
-        dy = 0.0
-        if keys[pygame.K_w]:
-            dy -= 1
-        if keys[pygame.K_s]:
-            dy += 1
-        if keys[pygame.K_a]:
-            dx -= 1
-        if keys[pygame.K_d]:
-            dx += 1
-
-        length = math.hypot(dx, dy)
-        if length:
-            scale = PLAYER_SPEED / length
-            dx *= scale
-            dy *= scale
-
-        if game_map is not None:
-            self.x, self.y = game_map.resolve_circle_move(
-                self.x, self.y, PLAYER_RADIUS, dx, dy, for_enemy=False
-            )
-        else:
-            self.x += dx
-            self.y += dy
-
-        mouse_x, mouse_y = pygame.mouse.get_pos()
-        world_mouse_x = mouse_x + camera.x
-        world_mouse_y = mouse_y + camera.y
-        self.angle = math.atan2(world_mouse_y - self.y, world_mouse_x - self.x)
-
-    def draw(self, screen, camera):
-        screen_x = self.x - camera.x
-        screen_y = self.y - camera.y
-
-        pygame.draw.circle(
-            screen,
-            COLOR_PLAYER,
-            (int(screen_x), int(screen_y)),
-            PLAYER_RADIUS,
+        self.x, self.y = game_map.resolve_circle_move(
+            self.x, self.y, self.radius, dx, dy, for_enemy=False
         )
 
-        vision_x = screen_x + math.cos(self.angle) * AIM_LINE_LENGTH
-        vision_y = screen_y + math.sin(self.angle) * AIM_LINE_LENGTH
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+        self.angle = math.atan2(
+            mouse_y + camera.y - self.y,
+            mouse_x + camera.x - self.x,
+        )
 
+    def draw(self, screen, camera):
+        self.draw_circle(screen, camera, COLOR_PLAYER)
+        if not self.alive:
+            return
+
+        screen_x = self.x - camera.x
+        screen_y = self.y - camera.y
+        aim_x = screen_x + math.cos(self.angle) * PLAYER_AIM_LENGTH
+        aim_y = screen_y + math.sin(self.angle) * PLAYER_AIM_LENGTH
         pygame.draw.line(
             screen,
             COLOR_PLAYER_AIM,
             (screen_x, screen_y),
-            (vision_x, vision_y),
-            3,
+            (aim_x, aim_y),
+            PLAYER_AIM_WIDTH,
         )
