@@ -8,6 +8,7 @@ class CircleEntity:
         self.x = float(x)
         self.y = float(y)
         self.radius = radius
+        self.max_hp = hp
         self.hp = hp
         self.alive = True
 
