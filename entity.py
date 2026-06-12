@@ -1,6 +1,22 @@
+import math
+from pathlib import Path
+
 import pygame
 
 from utils import circles_overlap, to_screen
+
+
+def load_sprite(filename, size):
+    sprite = pygame.image.load(Path(__file__).resolve().parent / "assets" / filename).convert_alpha()
+    if isinstance(size, int):
+        size = (size, size)
+    return pygame.transform.smoothscale(sprite, size)
+
+
+def draw_rotated_sprite(screen, sprite, x, y, camera, angle):
+    rotated = pygame.transform.rotate(sprite, -math.degrees(angle))
+    rect = rotated.get_rect(center=to_screen(x, y, camera))
+    screen.blit(rotated, rect)
 
 
 class CircleEntity:

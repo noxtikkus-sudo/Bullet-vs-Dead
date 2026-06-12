@@ -1,4 +1,5 @@
 import math
+from pathlib import Path
 
 import pygame
 
@@ -8,10 +9,6 @@ from settings import (
     BOARD_HITS,
     BOARD_INTERACT_DISTANCE,
     BOARD_SEGMENT_SIZE,
-    COLOR_FLOOR,
-    COLOR_WALL,
-    COLOR_WINDOW,
-    COLOR_WINDOW_BOARDED,
     DOOR_WIDTH,
     ENEMY_RADIUS,
     MAP_HEIGHT,
@@ -22,6 +19,37 @@ from settings import (
     ZOMBIE_BOARD_ATTACK_RANGE,
 )
 from utils import distance, tick_down
+
+
+def load_texture(filename):
+    return pygame.image.load(Path(__file__).resolve().parent / "assets" / filename).convert()
+
+
+def draw_textured_rect(screen, texture, rect, camera):
+    screen_rect = pygame.Rect(
+        int(rect.x - camera.x),
+        int(rect.y - camera.y),
+        rect.width,
+        rect.height,
+    )
+    clipped_rect = screen_rect.clip(screen.get_rect())
+    if clipped_rect.width <= 0 or clipped_rect.height <= 0:
+        return
+
+    tile_width, tile_height = texture.get_size()
+    world_left = int(clipped_rect.left + camera.x)
+    world_top = int(clipped_rect.top + camera.y)
+    start_world_x = world_left - world_left % tile_width
+    start_world_y = world_top - world_top % tile_height
+    start_x = int(start_world_x - camera.x)
+    start_y = int(start_world_y - camera.y)
+
+    old_clip = screen.get_clip()
+    screen.set_clip(clipped_rect)
+    for y in range(start_y, clipped_rect.bottom, tile_height):
+        for x in range(start_x, clipped_rect.right, tile_width):
+            screen.blit(texture, (x, y))
+    screen.set_clip(old_clip)
 
 
 class Window:
@@ -65,36 +93,50 @@ class Window:
         cy = max(self.rect.top, min(y, self.rect.bottom))
         return distance(x, y, cx, cy)
 
-    def draw(self, screen, camera):
-        screen_rect = self.rect.move(-camera.x, -camera.y)
-        pygame.draw.rect(screen, COLOR_WINDOW, screen_rect)
+    def draw(
+        self,
+        screen,
+        camera,
+        window_texture,
+        vertical_window_texture,
+        board_texture,
+        vertical_board_texture,
+    ):
+        horizontal = self.rect.width >= self.rect.height
+        draw_textured_rect(
+            screen,
+            window_texture if horizontal else vertical_window_texture,
+            self.rect,
+            camera,
+        )
         if not self.boards:
             return
 
-        horizontal = self.rect.width >= self.rect.height
         segment_count = self.max_boards
         segment_length = (
-            screen_rect.width / segment_count
+            self.rect.width / segment_count
             if horizontal
-            else screen_rect.height / segment_count
+            else self.rect.height / segment_count
         )
 
         for i in range(len(self.boards)):
             if horizontal:
                 seg = pygame.Rect(
-                    screen_rect.x + int(i * segment_length) + BOARD_DRAW_MARGIN,
-                    screen_rect.y + BOARD_DRAW_MARGIN,
+                    self.rect.x + int(i * segment_length) + BOARD_DRAW_MARGIN,
+                    self.rect.y + BOARD_DRAW_MARGIN,
                     int(segment_length) - BOARD_DRAW_INSET,
-                    screen_rect.height - BOARD_DRAW_INSET,
+                    self.rect.height - BOARD_DRAW_INSET,
                 )
+                texture = board_texture
             else:
                 seg = pygame.Rect(
-                    screen_rect.x + BOARD_DRAW_MARGIN,
-                    screen_rect.y + int(i * segment_length) + BOARD_DRAW_MARGIN,
-                    screen_rect.width - BOARD_DRAW_INSET,
+                    self.rect.x + BOARD_DRAW_MARGIN,
+                    self.rect.y + int(i * segment_length) + BOARD_DRAW_MARGIN,
+                    self.rect.width - BOARD_DRAW_INSET,
                     int(segment_length) - BOARD_DRAW_INSET,
                 )
-            pygame.draw.rect(screen, COLOR_WINDOW_BOARDED, seg)
+                texture = vertical_board_texture
+            draw_textured_rect(screen, texture, seg, camera)
 
     def spawn_outside(self, offset):
         offsets = {
@@ -114,6 +156,12 @@ class GameMap:
         self.windows = []
         self.floor_rects = []
         self.spawn_point = (0.0, 0.0)
+        self.floor_texture = load_texture("floor_texture.png")
+        self.wall_texture = load_texture("wall_texture.png")
+        self.window_texture = load_texture("broken_window_texture.png")
+        self.vertical_window_texture = pygame.transform.rotate(self.window_texture, 90)
+        self.board_texture = load_texture("board_texture.png")
+        self.vertical_board_texture = pygame.transform.rotate(self.board_texture, 90)
         self._build_layout()
 
     def _wall(self, x, y, w, h):
@@ -287,10 +335,16 @@ class GameMap:
                 break
 
     def draw(self, screen, camera):
-        offset = (-camera.x, -camera.y)
         for floor_rect in self.floor_rects:
-            pygame.draw.rect(screen, COLOR_FLOOR, floor_rect.move(offset))
+            draw_textured_rect(screen, self.floor_texture, floor_rect, camera)
         for wall in self.walls:
-            pygame.draw.rect(screen, COLOR_WALL, wall.move(offset))
+            draw_textured_rect(screen, self.wall_texture, wall, camera)
         for window in self.windows:
-            window.draw(screen, camera)
+            window.draw(
+                screen,
+                camera,
+                self.window_texture,
+                self.vertical_window_texture,
+                self.board_texture,
+                self.vertical_board_texture,
+            )

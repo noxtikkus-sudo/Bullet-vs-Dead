@@ -1,27 +1,32 @@
 import math
 
-import pygame
-
+from entity import draw_rotated_sprite, load_sprite
 from settings import (
     BULLET_DAMAGE,
     BULLET_MAX_DISTANCE,
     BULLET_MOVE_STEPS,
     BULLET_RADIUS,
+    BULLET_SPRITE,
+    BULLET_SPRITE_SIZE,
     BULLET_SPEED,
-    COLOR_BULLET,
 )
-from utils import distance, to_screen
+from utils import distance
 
 
 class Bullet:
+    _sprite = None
+
     def __init__(self, x, y, angle):
         self.x = float(x)
         self.y = float(y)
         self.start_x = self.x
         self.start_y = self.y
+        self.angle = angle
         self.vx = math.cos(angle) * BULLET_SPEED
         self.vy = math.sin(angle) * BULLET_SPEED
         self.alive = True
+        if Bullet._sprite is None:
+            Bullet._sprite = load_sprite(BULLET_SPRITE, BULLET_SPRITE_SIZE)
 
     def update(self, game_map, enemies):
         if not self.alive:
@@ -50,4 +55,4 @@ class Bullet:
     def draw(self, screen, camera):
         if not self.alive:
             return
-        pygame.draw.circle(screen, COLOR_BULLET, to_screen(self.x, self.y, camera), BULLET_RADIUS)
+        draw_rotated_sprite(screen, Bullet._sprite, self.x, self.y, camera, self.angle)
